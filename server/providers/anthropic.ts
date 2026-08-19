@@ -83,6 +83,19 @@ function mapAnthropicError(error: unknown) {
     })
   }
   if (error instanceof Anthropic.BadRequestError) {
+    // Anthropic returns 400 for an exhausted credit balance as well as for a
+    // malformed request. Telling the user to shorten their topic when the
+    // account simply needs topping up sends them chasing the wrong problem.
+    if (/credit balance|billing|purchase credits/i.test(error.message)) {
+      return appError('not_configured', {
+        userMessage:
+          'The AI provider is out of credit on this deployment. Please contact the site owner.',
+        message: error.message,
+        status: 503,
+        cause: error,
+      })
+    }
+
     return appError('invalid_input', {
       userMessage: 'The AI provider rejected this request. Try shortening the topic.',
       status: 400,
