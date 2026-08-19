@@ -123,7 +123,9 @@ export function EmailResult({
         </div>
         <p className="font-medium">Your draft will appear here</p>
         <p className="text-muted-foreground mt-1 max-w-xs text-sm text-pretty">
-          Describe the email on the left, pick a tone and a length, then hit Generate.
+          {/* Layout-agnostic wording: the form sits alongside on desktop but
+              above on phones, so "on the left" is wrong half the time. */}
+          Describe the email you need, pick a tone and a length, then hit Generate.
         </p>
       </CardContent>
     </Card>

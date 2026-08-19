@@ -160,6 +160,13 @@ agent's own steering.
 > **19.** "Write the README's 'what is not built' section honestly. A demo that
 > pretends is worse than one that admits."
 
+> **20. (verification, found a security hole)** "The schema is live — now try to
+> break it. Can a second user read the first user's drafts? Can a user reset
+> their own quota counter?"
+> — isolation held, but the quota did not: a plain `PATCH` with the public anon
+> key set `generations_used` back to zero. Fixed in `0002_lock_quota_column.sql`
+> with column privileges.
+
 ---
 
 ## 4. Where the AI was wrong
@@ -179,6 +186,12 @@ successes:
   serious rendering failure. The instinct to change code immediately would have
   damaged working animation logic; the discipline of confirming the diagnosis
   first prevented it.
+- **It confused row security with column security.** The migration enabled RLS,
+  wrote owner policies, and put the quota check on the server — all of which
+  read as correct. But RLS gates *rows*, not *columns*, so the "owner may update
+  their profile" policy also allowed `PATCH {"generations_used": 0}` from the
+  browser. The free-plan limit was bypassable in one HTTP request. Nothing in
+  the code review would have caught it; only attacking the live project did.
 - **It shipped a container that worked but was wrong.** The first image passed
   every smoke test while quietly downloading a package at startup — a
   network-dependent boot that would fail in an air-gapped or rate-limited
@@ -187,6 +200,11 @@ successes:
 The pattern: the AI produces plausible, well-structured code very fast, and the
 value a developer adds is almost entirely in **deciding what to verify** and
 **refusing to accept a workaround before understanding the cause**.
+
+The quota hole is the sharpest example. Every individual piece was defensible —
+RLS on, policies scoped to the owner, server-side check, atomic increment — and
+the flaw only existed in the gap between two of them. Reviewing the diff would
+not have found it. Sending one hostile HTTP request did.
 
 ---
 

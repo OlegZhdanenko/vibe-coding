@@ -80,7 +80,8 @@ export function SiteHeader({ navItems = MARKETING_NAV }: { navItems?: NavItem[] 
             </>
           )}
 
-          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+          {navItems.length > 0 ? (
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
                 <Menu className="size-5" />
@@ -114,8 +115,9 @@ export function SiteHeader({ navItems = MARKETING_NAV }: { navItems?: NavItem[] 
                   </SheetClose>
                 ) : null}
               </nav>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
+          ) : null}
         </div>
       </div>
     </header>

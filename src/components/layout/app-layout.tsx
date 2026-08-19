@@ -22,7 +22,9 @@ const ICONS = {
 export function AppLayout() {
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader navItems={APP_NAV} />
+      {/* The strip below owns navigation, so the header carries only the
+          brand and the account menu — repeating the links reads as a bug. */}
+      <SiteHeader navItems={[]} />
 
       <div className="border-border bg-background/60 sticky top-16 z-40 border-b backdrop-blur-md">
         <nav

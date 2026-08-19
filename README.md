@@ -79,8 +79,10 @@ the browser bundle and must be public; everything else stays server-side.
 1. Create a free project at [supabase.com](https://supabase.com).
 2. **Project Settings → API**: copy the URL and the `anon` key into `.env.local`,
    and the `service_role` key into the server variables.
-3. **SQL Editor**: paste and run [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql).
-   It is idempotent, so re-running is safe.
+3. **SQL Editor**: run the migrations in order —
+   [`0001_init.sql`](supabase/migrations/0001_init.sql) then
+   [`0002_lock_quota_column.sql`](supabase/migrations/0002_lock_quota_column.sql).
+   Both are idempotent, so re-running is safe.
 4. **Authentication → Providers → Email**: for a smoother demo, turn off
    "Confirm email". With it on, sign-up shows a "check your inbox" screen
    instead of signing straight in — both paths are handled.
@@ -93,6 +95,8 @@ The migration creates:
 - Row level security on both, so a row is only ever readable by its owner.
 - `increment_generations_used()` — a `security definer` function used by the
   endpoint to bump the quota counter atomically.
+- Column privileges that keep `generations_used` out of reach of the
+  `authenticated` role — see the note on quotas below.
 
 ---
 
@@ -218,11 +222,23 @@ The brief asks for no white screens, so there are four nets:
 4. Inline states — every async surface has explicit loading, empty, and error
    renderings, each with a way forward.
 
-### Quotas are enforced server-side
+### Quotas are enforced server-side — and row security alone was not enough
 
 The free-plan limit is checked in the handler using the service role key, and
-the counter is incremented by a `security definer` function. A client-side check
-would be a suggestion; this one is a rule.
+the counter is incremented by a `security definer` function.
+
+That was not sufficient on its own. Row level security decides which *rows* a
+role may touch, not which *columns*, so the "owner may update their profile"
+policy also let a user `PATCH` their own `generations_used` back to zero using
+nothing but the public anon key. The quota was bypassable in one HTTP request —
+found by actually trying it against the live project, not by reading the policy.
+
+`0002_lock_quota_column.sql` fixes it with column privileges: `authenticated`
+keeps `UPDATE` on `full_name`, `avatar_url` and `plan`, and loses it everywhere
+else. The counter is now writable only by the security-definer function and the
+service role. `plan` stays writable because the upgrade flow is a mocked
+checkout; wiring a real payment provider means dropping it from that grant and
+letting the webhook set it.
 
 ### Prompting
 
