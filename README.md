@@ -45,6 +45,9 @@ The app runs without any configuration, but with reduced capability:
 | Supabase + `GEMINI_API_KEY` | Everything, with real drafts. Google's free tier needs no card. |
 | Supabase + `ANTHROPIC_API_KEY` | Everything, with real drafts from Claude. |
 
+Gemini is the default when both keys are present, because it is the backend the
+live demo runs on. `EMAIL_PROVIDER=anthropic` overrides that.
+
 To try generation locally without any accounts:
 
 ```bash
@@ -67,11 +70,11 @@ the browser bundle and must be public; everything else stays server-side.
 | `VITE_SUPABASE_ANON_KEY` | client | for accounts | Public anon key; RLS is what protects data |
 | `VITE_APP_NAME` | client | no | Product name in the UI (default `Inboxly`) |
 | `VITE_API_BASE_URL` | client | no | Defaults to same-origin `/api` |
-| `ANTHROPIC_API_KEY` | server | one of the two | Claude, `claude-opus-5` |
-| `GEMINI_API_KEY` | server | one of the two | Gemini, `gemini-3.6-flash` — free tier, no card |
+| `GEMINI_API_KEY` | server | one of the two | Gemini, `gemini-3.6-flash` — the default backend; free tier, no card |
+| `ANTHROPIC_API_KEY` | server | one of the two | Claude, `claude-opus-5` — used when no Gemini key is set, or when pinned |
 | `SUPABASE_URL` | server | for accounts | Usually the same as `VITE_SUPABASE_URL` |
 | `SUPABASE_SERVICE_ROLE_KEY` | server | recommended | Lets the quota counter bypass RLS so users cannot reset their own usage |
-| `EMAIL_PROVIDER` | server | no | `anthropic`, `gemini` or `mock`. Omitted, the first available key wins: Anthropic, then Gemini, then the offline writer |
+| `EMAIL_PROVIDER` | server | no | `gemini`, `anthropic` or `mock`. Omitted, the first available key wins: Gemini, then Claude, then the offline writer |
 | `ALLOW_ANONYMOUS_GENERATION` | server | no | `true` allows unauthenticated generation — local development only |
 
 ---
@@ -131,7 +134,7 @@ The migration creates:
 | Animation | Framer Motion | Scroll reveals and result transitions |
 | Forms | React Hook Form + Zod | One schema validates the form and the endpoint |
 | Auth + data | Supabase | Auth, Postgres and row level security in one free tier |
-| AI | Claude `claude-opus-5` or Gemini `gemini-3.6-flash` | Three implementations of one interface; streaming in all cases |
+| AI | Gemini `gemini-3.6-flash` (default), Claude `claude-opus-5` | Three implementations of one interface; streaming in all cases |
 | Tests | Vitest + Testing Library | Same transform pipeline as the app |
 | Hosting | Vercel Function + Docker | Two deployment targets from one handler |
 
@@ -308,10 +311,8 @@ with no TypeScript toolchain at run time, and exposes `/healthz`.
 3. Deploy. `api/generate.ts` becomes a Node function; `vercel.json` rewrites
    everything except `/api/*` to `index.html` so deep links work.
 
-   Set **either** `GEMINI_API_KEY` **or** `ANTHROPIC_API_KEY`, not both, unless
-   you also pin `EMAIL_PROVIDER` — with both present Anthropic wins, and a
-   Claude account without credit will fail while a working Gemini key sits
-   unused.
+   `GEMINI_API_KEY` is all the live demo needs. If both keys are set, Gemini
+   wins; pin `EMAIL_PROVIDER=anthropic` to prefer Claude.
 
 ### Anywhere else
 
@@ -326,7 +327,7 @@ Node process on `PORT` (default 8080) — which is what the Docker image does.
 npm test
 ```
 
-35 tests across four files:
+37 tests across four files:
 
 - `src/lib/generation/prompt.test.ts` — prompt construction and the response
   parser, including the awkward cases: code fences, a bolded subject label, a
@@ -334,7 +335,8 @@ npm test
 - `server/generate-handler.test.ts` — the endpoint contract: method and CORS
   handling, malformed JSON, schema rejections, the streaming happy path, and the
   two failure modes that should never be opaque (missing auth, missing config).
-- `server/providers/index.test.ts` — the provider selection rules: precedence,
+- `server/providers/index.test.ts` — the provider selection rules: precedence
+  (Gemini first),
   explicit pinning, failing loudly when a pinned provider has no key, and
   degrading to the offline writer rather than breaking.
 - `src/features/generator/generator-form.test.tsx` — form behaviour through the

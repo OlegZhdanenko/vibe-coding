@@ -11,9 +11,15 @@ export type ProviderId = 'anthropic' | 'gemini' | 'mock'
  * Picks the provider for this deployment.
  *
  * `EMAIL_PROVIDER` forces a choice; otherwise the first available credential
- * wins, in descending order of output quality, and the offline writer is the
- * floor so the app is never simply broken. Adding a provider is one more entry
- * in the table below plus the file that implements the interface.
+ * wins, and the offline writer is the floor so the app is never simply broken.
+ *
+ * Gemini is tried before Claude deliberately. It is the backend this deployment
+ * actually runs on — its free tier needs no billing — so a stray
+ * `ANTHROPIC_API_KEY` on an account without credit cannot silently take over
+ * and break generation. Set `EMAIL_PROVIDER=anthropic` to prefer Claude.
+ *
+ * Adding a provider is one more case below plus the file implementing the
+ * interface; nothing above this function changes.
  */
 export function resolveProvider(env: Record<string, string | undefined>): EmailProvider {
   const requested = env.EMAIL_PROVIDER?.trim().toLowerCase()
@@ -40,8 +46,8 @@ export function resolveProvider(env: Record<string, string | undefined>): EmailP
       console.warn(`[generate] Unknown EMAIL_PROVIDER "${requested}" — falling back to auto-select.`)
   }
 
-  if (anthropicKey) return createAnthropicProvider(anthropicKey)
   if (geminiKey) return createGeminiProvider(geminiKey)
+  if (anthropicKey) return createAnthropicProvider(anthropicKey)
 
   console.warn('[generate] No AI credentials found — falling back to the offline provider.')
   return createMockProvider()

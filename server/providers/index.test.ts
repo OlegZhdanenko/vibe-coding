@@ -15,14 +15,28 @@ describe('resolveProvider', () => {
     warn.mockRestore()
   })
 
-  it('prefers Anthropic when both keys are present', () => {
+  it('prefers Gemini when both keys are present', () => {
+    // Deliberate: Gemini is the backend this deployment runs on, so a stray
+    // Anthropic key must not silently take over.
     const provider = resolveProvider({ ANTHROPIC_API_KEY: 'sk-ant-x', GEMINI_API_KEY: 'g-x' })
-    expect(provider.id).toBe('anthropic')
+    expect(provider.id).toBe('gemini')
   })
 
   it('uses Gemini when only its key is present', () => {
-    const provider = resolveProvider({ GEMINI_API_KEY: 'g-x' })
-    expect(provider.id).toBe('gemini')
+    expect(resolveProvider({ GEMINI_API_KEY: 'g-x' }).id).toBe('gemini')
+  })
+
+  it('uses Anthropic when only its key is present', () => {
+    expect(resolveProvider({ ANTHROPIC_API_KEY: 'sk-ant-x' }).id).toBe('anthropic')
+  })
+
+  it('honours an explicit preference for Anthropic', () => {
+    const provider = resolveProvider({
+      EMAIL_PROVIDER: 'anthropic',
+      ANTHROPIC_API_KEY: 'sk-ant-x',
+      GEMINI_API_KEY: 'g-x',
+    })
+    expect(provider.id).toBe('anthropic')
   })
 
   it('honours an explicit choice over the available keys', () => {
