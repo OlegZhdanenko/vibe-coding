@@ -1,75 +1,322 @@
-# React + TypeScript + Vite
+# Inboxly — AI Email Generator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Describe the email you need to write, pick a tone and a length, and get a
+send-ready subject line and message. Built as a 48-hour MVP test assignment.
 
-Currently, two official plugins are available:
+- **Live demo:** _to be filled in after deployment_
+- **Repository:** _to be filled in after the first push_
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Contents
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- [Quick start](#quick-start)
+- [Environment variables](#environment-variables)
+- [Supabase setup](#supabase-setup)
+- [Available scripts](#available-scripts)
+- [Tech stack](#tech-stack)
+- [Project structure](#project-structure)
+- [Architecture and decisions](#architecture-and-decisions)
+- [Docker](#docker)
+- [Deployment](#deployment)
+- [Testing](#testing)
+- [What is not built](#what-is-not-built)
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Quick start
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Requirements: **Node 24+** and npm.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+git clone <repository-url>
+cd vibe-coding
+npm install
+cp .env.example .env.local   # fill in the values, see below
+npm run dev                  # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The app runs without any configuration, but with reduced capability:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Configuration | What works |
+|---|---|
+| Nothing set | Landing, pricing, 404, theming. Sign-in shows a "not configured" notice. |
+| Supabase only | Accounts, dashboard, history. Generation falls back to the offline writer. |
+| Supabase + `ANTHROPIC_API_KEY` | Everything, with real drafts from Claude. |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+To try generation locally without any accounts:
+
+```bash
+EMAIL_PROVIDER=mock ALLOW_ANONYMOUS_GENERATION=true npm run dev
+```
+
+`npm run dev` serves the API from the same port as the client, so no second
+process and no `vercel dev` are needed.
+
+---
+
+## Environment variables
+
+Copy `.env.example` to `.env.local`. Anything prefixed `VITE_` is compiled into
+the browser bundle and must be public; everything else stays server-side.
+
+| Variable | Where | Required | Purpose |
+|---|---|---|---|
+| `VITE_SUPABASE_URL` | client | for accounts | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | client | for accounts | Public anon key; RLS is what protects data |
+| `VITE_APP_NAME` | client | no | Product name in the UI (default `Inboxly`) |
+| `VITE_API_BASE_URL` | client | no | Defaults to same-origin `/api` |
+| `ANTHROPIC_API_KEY` | server | for real drafts | Without it the offline writer is used |
+| `SUPABASE_URL` | server | for accounts | Usually the same as `VITE_SUPABASE_URL` |
+| `SUPABASE_SERVICE_ROLE_KEY` | server | recommended | Lets the quota counter bypass RLS so users cannot reset their own usage |
+| `EMAIL_PROVIDER` | server | no | `anthropic` or `mock`; otherwise inferred from the API key |
+| `ALLOW_ANONYMOUS_GENERATION` | server | no | `true` allows unauthenticated generation — local development only |
+
+---
+
+## Supabase setup
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. **Project Settings → API**: copy the URL and the `anon` key into `.env.local`,
+   and the `service_role` key into the server variables.
+3. **SQL Editor**: paste and run [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql).
+   It is idempotent, so re-running is safe.
+4. **Authentication → Providers → Email**: for a smoother demo, turn off
+   "Confirm email". With it on, sign-up shows a "check your inbox" screen
+   instead of signing straight in — both paths are handled.
+
+The migration creates:
+
+- `profiles` — one row per user, holding the plan and the usage counter, created
+  automatically by a trigger on `auth.users`.
+- `emails` — generation history.
+- Row level security on both, so a row is only ever readable by its owner.
+- `increment_generations_used()` — a `security definer` function used by the
+  endpoint to bump the quota counter atomically.
+
+---
+
+## Available scripts
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | Vite dev server, with `/api/generate` mounted as middleware |
+| `npm run build` | Typechecks the whole repo, then builds the client |
+| `npm run build:server` | Bundles the Node server for self-hosting |
+| `npm start` | Runs the bundled server (expects `dist/` and `dist-server/`) |
+| `npm run preview` | Serves the built client (no API) |
+| `npm run lint` | ESLint across app, server and config |
+| `npm run typecheck` | `tsc -b` across all three TS projects |
+| `npm test` | Vitest, once |
+| `npm run test:watch` | Vitest, watching |
+| `npm run test:coverage` | Vitest with V8 coverage |
+
+---
+
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Build | Vite 8 | Fast dev server, and its middleware hook lets the API run in-process |
+| UI | React 19 + TypeScript | Required by the brief; TS strict throughout |
+| Routing | React Router 7 | `errorElement` per route is the backbone of the error handling |
+| Styling | Tailwind CSS 4 | Token-driven theming via CSS variables, no config file needed |
+| Components | shadcn/ui | Accessible Radix primitives, owned in-repo rather than a black-box dependency |
+| Animation | Framer Motion | Scroll reveals and result transitions |
+| Forms | React Hook Form + Zod | One schema validates the form and the endpoint |
+| Auth + data | Supabase | Auth, Postgres and row level security in one free tier |
+| AI | Anthropic `claude-opus-5` | Streaming, behind a provider interface |
+| Tests | Vitest + Testing Library | Same transform pipeline as the app |
+| Hosting | Vercel (edge function) + Docker | Two deployment targets from one handler |
+
+---
+
+## Project structure
 
 ```
+.
+├── api/
+│   └── generate.ts              # Vercel edge adapter (12 lines, no logic)
+├── server/
+│   ├── generate-handler.ts      # The endpoint: validation, auth, quota, streaming
+│   ├── node-server.ts           # Self-hosted host for the same handler (Docker)
+│   ├── vite-dev-api.ts          # Dev-server host for the same handler
+│   └── providers/               # The AI seam
+│       ├── types.ts             #   EmailProvider interface
+│       ├── anthropic.ts         #   Claude implementation
+│       ├── mock.ts              #   Offline implementation
+│       └── index.ts             #   resolveProvider()
+├── src/
+│   ├── app/                     # Router and root layout (providers live here)
+│   ├── components/
+│   │   ├── ui/                  # shadcn primitives
+│   │   ├── common/              # Error states, section primitives, logo, loader
+│   │   └── layout/              # Public, app and auth shells
+│   ├── features/                # Vertical slices
+│   │   ├── auth/                #   provider, guards, forms, error mapping
+│   │   ├── generator/           #   form, result, history, hooks
+│   │   ├── billing/             #   upgrade flow
+│   │   └── marketing/           #   landing content and hero preview
+│   ├── lib/
+│   │   ├── errors.ts            # AppError vocabulary shared by client and server
+│   │   ├── generation/          # Shared contract: types, schema, prompt, client
+│   │   ├── plans.ts             # Plan catalogue
+│   │   ├── supabase.ts          # Client, null when unconfigured
+│   │   └── env.ts               # Typed env access, never throws at import
+│   ├── pages/                   # One file per route, default-exported, lazy-loaded
+│   └── types/database.ts        # Mirror of the SQL schema
+├── supabase/migrations/         # Schema, RLS policies, triggers
+├── Dockerfile                   # Multi-stage, non-root, healthchecked
+└── .github/workflows/ci.yml     # Lint → typecheck → test → build → container smoke test
+```
+
+Two rules keep this navigable: **pages compose, features own logic**, and
+anything under `src/lib/generation` uses relative imports only, because the
+server bundle imports it and does not share the `@/` alias.
+
+---
+
+## Architecture and decisions
+
+### The AI provider is a seam, not a call site
+
+`EmailProvider` is a three-member interface: an id, a model name, and
+`stream()`, which yields text chunks. Everything else — validation, auth,
+quotas, transport, persistence, error mapping — sits above it and knows nothing
+about Claude. Swapping models means adding one file and one line in
+`resolveProvider()`.
+
+The offline provider is not a toy: it drives the same streaming path, and it is
+what the tests and CI run against, so the pipeline is exercised on every commit
+without spending a token.
+
+### One handler, three hosts
+
+`handleGenerate(request, env)` takes a Web `Request` and returns a Web
+`Response`. That single signature is hosted by the Vercel edge function, the
+Vite dev middleware, and the Node server in the Docker image. The alternative —
+a Vercel-shaped handler plus a separate local mock — means production runs code
+that development never exercises.
+
+### Streaming as newline-delimited JSON
+
+The endpoint streams NDJSON frames (`delta`, `done`, `error`) rather than
+returning one JSON body. Drafts appear as they are written, which is the
+difference between a four-second wait and a four-second progress indicator.
+`error` is a frame rather than a status code because by the time a provider
+fails mid-stream, the 200 has already been sent.
+
+### Error handling, deliberately layered
+
+The brief asks for no white screens, so there are four nets:
+
+1. `AppError` — a closed set of codes with a user-safe message on every one.
+   Supabase and Anthropic errors are translated at their boundaries, never
+   surfaced raw.
+2. Route `errorElement` — catches loader throws and render errors below a route.
+3. `ErrorBoundary` — wraps the router, catching what routing cannot.
+4. Inline states — every async surface has explicit loading, empty, and error
+   renderings, each with a way forward.
+
+### Quotas are enforced server-side
+
+The free-plan limit is checked in the handler using the service role key, and
+the counter is incremented by a `security definer` function. A client-side check
+would be a suggestion; this one is a rule.
+
+### Prompting
+
+The system prompt fixes an output contract — `Subject:` on line one, blank
+line, body — and the parser treats that contract as advisory: if the marker is
+missing, the whole output becomes the body rather than being dropped. The
+request runs at `effort: 'low'` with adaptive thinking left on, which is the
+right trade for short, routine writing, and server-side fallbacks are enabled so
+a policy decline on a borderline topic is retried rather than dead-ending.
+
+---
+
+## Docker
+
+```bash
+docker build -t inboxly .
+docker run -p 8080:8080 \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -e SUPABASE_URL=https://your-project.supabase.co \
+  -e SUPABASE_SERVICE_ROLE_KEY=... \
+  inboxly
+```
+
+Client-side variables are compiled in, so pass them as build args:
+
+```bash
+docker build -t inboxly \
+  --build-arg VITE_SUPABASE_URL=https://your-project.supabase.co \
+  --build-arg VITE_SUPABASE_ANON_KEY=your-anon-key .
+```
+
+To try the container with no credentials at all:
+
+```bash
+docker run -p 8080:8080 -e EMAIL_PROVIDER=mock -e ALLOW_ANONYMOUS_GENERATION=true inboxly
+```
+
+The image is multi-stage, runs as the `node` user, ships a pre-bundled server
+with no TypeScript toolchain at run time, and exposes `/healthz`.
+
+---
+
+## Deployment
+
+### Vercel
+
+1. Import the repository at [vercel.com/new](https://vercel.com/new). The Vite
+   preset and `vercel.json` are picked up automatically.
+2. Add the environment variables from the table above under
+   **Settings → Environment Variables**. `VITE_*` values must be present at
+   build time.
+3. Deploy. `api/generate.ts` becomes an edge function; `vercel.json` rewrites
+   everything except `/api/*` to `index.html` so deep links work.
+
+### Anywhere else
+
+`npm run build && npm run build:server && npm start` serves both halves from one
+Node process on `PORT` (default 8080) — which is what the Docker image does.
+
+---
+
+## Testing
+
+```bash
+npm test
+```
+
+27 tests across three files:
+
+- `src/lib/generation/prompt.test.ts` — prompt construction and the response
+  parser, including the awkward cases: code fences, a bolded subject label, a
+  missing subject line, an over-long subject, empty output.
+- `server/generate-handler.test.ts` — the endpoint contract: method and CORS
+  handling, malformed JSON, schema rejections, the streaming happy path, and the
+  two failure modes that should never be opaque (missing auth, missing config).
+- `src/features/generator/generator-form.test.tsx` — form behaviour through the
+  DOM: validation blocking submission, defaults being submitted, recipient
+  trimming, the busy and quota-blocked states.
+
+They run against the offline provider, so the suite needs no API key and no
+network.
+
+---
+
+## What is not built
+
+Stated plainly, because a demo that pretends is worse than one that admits:
+
+- **Payments.** Stripe is not integrated. The upgrade flow is a real flow with a
+  mocked processor: it says so on screen, and it does move the account onto the
+  plan so the quota actually lifts.
+- **Password reset.** Sign-up, sign-in, sign-out and password change work;
+  "forgot password" is not wired up.
+- **Account deletion.** Requires the Supabase admin API and a server route.
+- **History paging.** The dashboard shows the 20 most recent drafts.
+- **E2E tests.** The suite is unit and component level; there is no Playwright
+  run in CI.
