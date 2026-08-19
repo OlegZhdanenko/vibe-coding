@@ -77,12 +77,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback<AuthContextValue['signUp']>(async ({ email, password, fullName }) => {
     try {
       const client = requireSupabase()
-      const { error } = await client.auth.signUp({
+      const { data, error } = await client.auth.signUp({
         email,
         password,
         options: { data: { full_name: fullName } },
       })
       if (error) throw error
+
+      return { needsEmailConfirmation: !data.session }
     } catch (error) {
       throw mapAuthError(error)
     }

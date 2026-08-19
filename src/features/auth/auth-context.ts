@@ -8,7 +8,15 @@ export interface AuthContextValue {
   profile: ProfileRow | null
   /** True until the initial session lookup settles — gates route redirects. */
   initialising: boolean
-  signUp: (input: { email: string; password: string; fullName: string }) => Promise<void>
+  /**
+   * Resolves with `needsEmailConfirmation: true` when the project requires a
+   * confirmation link, in which case no session exists yet.
+   */
+  signUp: (input: {
+    email: string
+    password: string
+    fullName: string
+  }) => Promise<{ needsEmailConfirmation: boolean }>
   signIn: (input: { email: string; password: string }) => Promise<void>
   signOut: () => Promise<void>
   updateProfile: (patch: Partial<Pick<ProfileRow, 'full_name' | 'plan'>>) => Promise<void>
