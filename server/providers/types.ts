@@ -1,4 +1,4 @@
-import type { GenerateEmailInput } from '../../src/lib/generation/types'
+import type { GenerateEmailInput } from '../../src/lib/generation/types.js'
 
 /**
  * The seam between the app and whichever model writes the email.

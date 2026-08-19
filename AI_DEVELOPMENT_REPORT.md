@@ -188,7 +188,15 @@ agent's own steering.
 > something that was not theirs to fix. Now surfaced as a configuration error
 > aimed at the site owner.
 
-> **23. (self-correction)** "The Anthropic SDK refuses to construct under jsdom,
+> **23. (deployment failure, real)** "Vercel rejected the deploy: the edge
+> function references `node:fs` and `node:path` through the Anthropic SDK.
+> Choose between dropping the SDK and changing runtime — do not paper over it."
+> — moved the function to the Node runtime and extracted `http-adapter.ts`,
+> which removed duplication between the dev middleware and the Docker server at
+> the same time. The handler itself did not change, which was the point of
+> writing it against Web types.
+
+> **24. (self-correction)** "The Anthropic SDK refuses to construct under jsdom,
 > so the provider tests fail. Split the suite by environment instead of
 > weakening the SDK's guard."
 > — the SDK is right: constructing it in a browser context implies an API key
@@ -224,6 +232,11 @@ successes:
   for both a malformed request and an empty credit balance. One mapping covered
   both, so "add credits to your account" reached the user as "try shortening the
   topic" — an error message that actively misdirects is worse than a generic one.
+- **It picked a runtime without checking what the dependency needed.** The edge
+  runtime is the obvious choice for a streaming endpoint, and it typechecked,
+  built, and passed every local test — because none of that exercises Vercel's
+  module restrictions. The failure appeared only at deploy time. Local green is
+  not deployment green.
 - **It shipped a container that worked but was wrong.** The first image passed
   every smoke test while quietly downloading a package at startup — a
   network-dependent boot that would fail in an air-gapped or rate-limited

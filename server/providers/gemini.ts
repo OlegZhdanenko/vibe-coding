@@ -1,7 +1,7 @@
-import { appError } from '../../src/lib/errors'
-import { SYSTEM_PROMPT, buildUserPrompt, maxTokensFor } from '../../src/lib/generation/prompt'
-import type { GenerateEmailInput } from '../../src/lib/generation/types'
-import type { EmailProvider } from './types'
+import { appError } from '../../src/lib/errors.js'
+import { SYSTEM_PROMPT, buildUserPrompt, maxTokensFor } from '../../src/lib/generation/prompt.js'
+import type { GenerateEmailInput } from '../../src/lib/generation/types.js'
+import type { EmailProvider } from './types.js'
 
 const MODEL = 'gemini-3.6-flash'
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse`

@@ -1,9 +1,9 @@
-import { createAnthropicProvider } from './anthropic'
-import { createGeminiProvider } from './gemini'
-import { createMockProvider } from './mock'
-import type { EmailProvider } from './types'
+import { createAnthropicProvider } from './anthropic.js'
+import { createGeminiProvider } from './gemini.js'
+import { createMockProvider } from './mock.js'
+import type { EmailProvider } from './types.js'
 
-export type { EmailProvider } from './types'
+export type { EmailProvider } from './types.js'
 
 export type ProviderId = 'anthropic' | 'gemini' | 'mock'
 

@@ -133,7 +133,7 @@ The migration creates:
 | Auth + data | Supabase | Auth, Postgres and row level security in one free tier |
 | AI | Claude `claude-opus-5` or Gemini `gemini-3.6-flash` | Three implementations of one interface; streaming in all cases |
 | Tests | Vitest + Testing Library | Same transform pipeline as the app |
-| Hosting | Vercel (edge function) + Docker | Two deployment targets from one handler |
+| Hosting | Vercel Function + Docker | Two deployment targets from one handler |
 
 ---
 
@@ -142,9 +142,10 @@ The migration creates:
 ```
 .
 ├── api/
-│   └── generate.ts              # Vercel edge adapter (12 lines, no logic)
+│   └── generate.ts              # Vercel adapter (a few lines, no logic)
 ├── server/
 │   ├── generate-handler.ts      # The endpoint: validation, auth, quota, streaming
+│   ├── http-adapter.ts          # Node ↔ Web Request/Response bridge, shared by all hosts
 │   ├── node-server.ts           # Self-hosted host for the same handler (Docker)
 │   ├── vite-dev-api.ts          # Dev-server host for the same handler
 │   └── providers/               # The AI seam
@@ -204,10 +205,17 @@ without spending a token.
 ### One handler, three hosts
 
 `handleGenerate(request, env)` takes a Web `Request` and returns a Web
-`Response`. That single signature is hosted by the Vercel edge function, the
-Vite dev middleware, and the Node server in the Docker image. The alternative —
-a Vercel-shaped handler plus a separate local mock — means production runs code
-that development never exercises.
+`Response`. That single signature is hosted by the Vercel function, the Vite dev
+middleware, and the Node server in the Docker image, each through the same
+`http-adapter.ts`. The alternative — a Vercel-shaped handler plus a separate
+local mock — means production runs code that development never exercises.
+
+The Vercel function runs on the **Node runtime, not edge**. Edge would suit a
+streaming endpoint better, but the Anthropic SDK pulls in `node:fs` and
+`node:path`, which the edge runtime rejects. Given the choice between dropping
+the official SDK for hand-rolled HTTP and moving one adapter to Node, the Node
+runtime is the smaller compromise — it streams fine, and the handler is
+untouched either way.
 
 ### Streaming as newline-delimited JSON
 
@@ -297,8 +305,13 @@ with no TypeScript toolchain at run time, and exposes `/healthz`.
 2. Add the environment variables from the table above under
    **Settings → Environment Variables**. `VITE_*` values must be present at
    build time.
-3. Deploy. `api/generate.ts` becomes an edge function; `vercel.json` rewrites
+3. Deploy. `api/generate.ts` becomes a Node function; `vercel.json` rewrites
    everything except `/api/*` to `index.html` so deep links work.
+
+   Set **either** `GEMINI_API_KEY` **or** `ANTHROPIC_API_KEY`, not both, unless
+   you also pin `EMAIL_PROVIDER` — with both present Anthropic wins, and a
+   Claude account without credit will fail while a working Gemini key sits
+   unused.
 
 ### Anywhere else
 

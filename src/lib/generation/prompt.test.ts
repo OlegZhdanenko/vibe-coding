@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SYSTEM_PROMPT, buildUserPrompt, maxTokensFor, parseGeneratedEmail } from './prompt'
-import type { GenerateEmailInput } from './types'
+import { SYSTEM_PROMPT, buildUserPrompt, maxTokensFor, parseGeneratedEmail } from './prompt.js'
+import type { GenerateEmailInput } from './types.js'
 
 const baseInput: GenerateEmailInput = {
   topic: 'Ask my manager for two days off next week',

@@ -5,7 +5,7 @@ import {
   MAX_RECIPIENT_LENGTH,
   MAX_TOPIC_LENGTH,
   TONE_IDS,
-} from './types'
+} from './types.js'
 
 /**
  * One schema, enforced on both sides: the form validates against it before

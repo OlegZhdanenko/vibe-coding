@@ -1,14 +1,15 @@
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { extname, join, normalize, resolve } from 'node:path'
-import { handleGenerate } from './generate-handler'
+import { handleGenerate } from './generate-handler.js'
+import { requestUrl, toWebRequest, writeWebResponse } from './http-adapter.js'
 
 /**
  * Self-hosted entry point: serves the built SPA and the generation endpoint
  * from one Node process. This is what the Docker image runs.
  *
  * It is the third host for the same `handleGenerate` function — after the
- * Vercel edge function and the Vite dev middleware — which is the point of
+ * Vercel function and the Vite dev middleware — which is the point of
  * writing the handler against Web `Request`/`Response` rather than against a
  * particular framework.
  */
@@ -38,7 +39,7 @@ const server = createServer((req, res) => {
 })
 
 async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
+  const url = requestUrl(req)
 
   if (url.pathname === '/healthz') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -48,7 +49,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
   if (url.pathname === '/api/generate') {
     const response = await handleGenerate(await toWebRequest(req, url), process.env)
-    await writeResponse(res, response)
+    await writeWebResponse(res, response)
     return
   }
 
@@ -78,44 +79,6 @@ function serveStatic(pathname: string, res: ServerResponse): void {
     'Cache-Control': isHtml ? 'no-cache' : 'public, max-age=31536000, immutable',
   })
   createReadStream(filePath).pipe(res)
-}
-
-async function toWebRequest(req: IncomingMessage, url: URL): Promise<Request> {
-  const chunks: Buffer[] = []
-  for await (const chunk of req) chunks.push(chunk as Buffer)
-
-  const headers = new Headers()
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (typeof value === 'string') headers.set(key, value)
-    else if (Array.isArray(value)) headers.set(key, value.join(', '))
-  }
-
-  const method = req.method ?? 'GET'
-  return new Request(url, {
-    method,
-    headers,
-    body: method === 'GET' || method === 'HEAD' ? undefined : Buffer.concat(chunks),
-  })
-}
-
-async function writeResponse(res: ServerResponse, response: Response): Promise<void> {
-  res.writeHead(response.status, Object.fromEntries(response.headers.entries()))
-
-  if (!response.body) {
-    res.end()
-    return
-  }
-
-  const reader = response.body.getReader()
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      res.write(value)
-    }
-  } finally {
-    res.end()
-  }
 }
 
 server.listen(PORT, () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { resolveProvider } from './index'
+import { resolveProvider } from './index.js'
 
 /**
  * The provider seam is the part of the system most likely to be changed by

@@ -1,6 +1,6 @@
-import { TONES } from '../../src/lib/generation/types'
-import type { GenerateEmailInput } from '../../src/lib/generation/types'
-import type { EmailProvider } from './types'
+import { TONES } from '../../src/lib/generation/types.js'
+import type { GenerateEmailInput } from '../../src/lib/generation/types.js'
+import type { EmailProvider } from './types.js'
 
 /**
  * Offline stand-in for the real model.

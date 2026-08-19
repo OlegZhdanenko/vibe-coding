@@ -1,10 +1,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { AppError, appError } from '../src/lib/errors'
-import { parseGeneratedEmail } from '../src/lib/generation/prompt'
-import { generateEmailSchema } from '../src/lib/generation/schema'
-import type { GenerateEmailInput, GenerationEvent } from '../src/lib/generation/types'
-import type { Database } from '../src/types/database'
-import { resolveProvider } from './providers'
+import { AppError, appError } from '../src/lib/errors.js'
+import { parseGeneratedEmail } from '../src/lib/generation/prompt.js'
+import { generateEmailSchema } from '../src/lib/generation/schema.js'
+import type { GenerateEmailInput, GenerationEvent } from '../src/lib/generation/types.js'
+import type { Database } from '../src/types/database.js'
+import { resolveProvider } from './providers/index.js'
 
 /** Generations allowed per month on the free plan. */
 export const FREE_PLAN_LIMIT = 10

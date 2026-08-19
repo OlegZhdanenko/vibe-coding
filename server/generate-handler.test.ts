@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { GenerationEvent } from '../src/lib/generation/types'
-import { handleGenerate } from './generate-handler'
+import type { GenerationEvent } from '../src/lib/generation/types.js'
+import { handleGenerate } from './generate-handler.js'
 
 /** Deployment with no Supabase and the offline provider — what CI runs. */
 const ANONYMOUS_ENV = {

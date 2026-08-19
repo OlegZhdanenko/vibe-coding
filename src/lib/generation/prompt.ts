@@ -5,7 +5,7 @@ import {
   type GeneratedEmail,
   type LengthId,
   type ToneId,
-} from './types'
+} from './types.js'
 
 /**
  * Prompt construction and response parsing, kept pure and provider-agnostic so

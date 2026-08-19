@@ -23,7 +23,12 @@ export class AppError extends Error {
   /** Safe to render verbatim; `message` may carry developer detail. */
   readonly userMessage: string
   readonly status?: number
-  override readonly cause?: unknown
+  /**
+   * Not marked `override`: `Error.cause` only exists in ES2022 and later libs,
+   * and this file is compiled by consumers with older settings — including
+   * Vercel's function typecheck, where `override` is an error.
+   */
+  readonly cause?: unknown
 
   constructor(
     code: AppErrorCode,

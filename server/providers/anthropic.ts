@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { appError } from '../../src/lib/errors'
-import { SYSTEM_PROMPT, buildUserPrompt, maxTokensFor } from '../../src/lib/generation/prompt'
-import type { GenerateEmailInput } from '../../src/lib/generation/types'
-import type { EmailProvider } from './types'
+import { appError } from '../../src/lib/errors.js'
+import { SYSTEM_PROMPT, buildUserPrompt, maxTokensFor } from '../../src/lib/generation/prompt.js'
+import type { GenerateEmailInput } from '../../src/lib/generation/types.js'
+import type { EmailProvider } from './types.js'
 
 const MODEL = 'claude-opus-5'
 

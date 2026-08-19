@@ -1,14 +1,20 @@
-import { handleGenerate } from '../server/generate-handler'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { handleGenerate } from '../server/generate-handler.js'
+import { requestUrl, toWebRequest, writeWebResponse } from '../server/http-adapter.js'
 
 /**
- * Vercel Edge Function.
+ * Vercel Function (Node runtime).
  *
- * The edge runtime speaks Web `Request`/`Response`, which is exactly the shape
- * `handleGenerate` expects — this file is only an adapter, so there is no
- * production-only logic that local development cannot exercise.
+ * The edge runtime would be the natural fit for a streaming endpoint, but the
+ * Anthropic SDK pulls in `node:fs` and `node:path`, which edge rejects. Rather
+ * than drop the official SDK for hand-rolled HTTP, this runs on Node and adapts
+ * the request and response — the Node runtime streams fine, and the handler
+ * itself is unchanged.
  */
-export const config = { runtime: 'edge' }
+export const config = { runtime: 'nodejs' }
 
-export default function handler(request: Request): Promise<Response> {
-  return handleGenerate(request, process.env as Record<string, string | undefined>)
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = requestUrl(req, '/api/generate')
+  const response = await handleGenerate(await toWebRequest(req, url), process.env)
+  await writeWebResponse(res, response)
 }
