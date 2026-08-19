@@ -14,8 +14,13 @@ export function ConfigNotice() {
       <Info className="size-4" aria-hidden="true" />
       <AlertTitle>Accounts are not configured</AlertTitle>
       <AlertDescription>
-        This deployment is missing <code>VITE_SUPABASE_URL</code> and{' '}
-        <code>VITE_SUPABASE_ANON_KEY</code>, so sign-in is disabled. See the README for setup.
+        {/* AlertDescription lays its children out as a grid, so inline <code>
+            elements must sit inside a single block to flow as one sentence. */}
+        <p>
+          This deployment is missing <code className="font-mono text-xs">VITE_SUPABASE_URL</code>{' '}
+          and <code className="font-mono text-xs">VITE_SUPABASE_ANON_KEY</code>, so sign-in is
+          disabled. See the README for setup.
+        </p>
       </AlertDescription>
     </Alert>
   )
