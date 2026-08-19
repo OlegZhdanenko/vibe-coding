@@ -69,7 +69,9 @@ export function buildUserPrompt(input: GenerateEmailInput): string {
   return lines.join('\n')
 }
 
-const SUBJECT_PATTERN = /^\s*(?:\*\*)?subject(?:\*\*)?\s*[::]\s*(.+)$/i
+// Asterisks are allowed on either side of the colon: models bold the label as
+// `**Subject:**` about as often as `**Subject**:`.
+const SUBJECT_PATTERN = /^\s*\*{0,2}\s*subject\s*\*{0,2}\s*[::]\s*\*{0,2}\s*(.+?)\s*\*{0,2}\s*$/i
 
 /**
  * Split the model output into a subject and a body.
