@@ -12,12 +12,21 @@ and what I would do next.
 | **Claude Code** (CLI, in VS Code) | **Claude Opus 5** (`claude-opus-5`) | The entire build: planning, code, tests, docs, debugging, verification |
 | **shadcn/ui CLI** | — | Vendoring the Radix-based component primitives |
 | **Headless Chrome via CDP** | — | Driven by the agent to screenshot and measure the running app |
-| **Anthropic API** | **Claude Opus 5** (`claude-opus-5`) | The product itself — the model that writes the emails |
+| **Anthropic API** | **Claude Opus 5** (`claude-opus-5`) | The product — one of two model backends |
+| **Google Gemini API** | **Gemini 3.6 Flash** (`gemini-3.6-flash`) | The product — the free-tier backend the live demo runs on |
 
 One agent, one model. I deliberately did not spread the work across several
 assistants: the value of an agentic tool is that it holds the whole repository
 in context, and splitting the work would have meant re-establishing that context
 repeatedly.
+
+**Two backends, one interface.** The build started on Claude alone. Gemini was
+added later, when the Anthropic account turned out to have no credit — and that
+turned into the best available evidence that the provider seam was real rather
+than aspirational: it cost one new file and one line, with the prompt builder,
+parser, streaming transport, quota logic and every existing test untouched. The
+live demo runs on Gemini's free tier; setting `ANTHROPIC_API_KEY` switches it to
+Claude with no code change.
 
 **Model choice for the product.** `claude-opus-5` with `output_config.effort:
 'low'` and adaptive thinking left on. Writing one short email is routine work,
@@ -167,6 +176,25 @@ agent's own steering.
 > key set `generations_used` back to zero. Fixed in `0002_lock_quota_column.sql`
 > with column privileges.
 
+> **21. (mine)** "Which AI can be used for free — OpenAI? Gemini?"
+> — the answer that mattered was that OpenAI has no free API tier at all, while
+> Gemini's is genuinely free and needs no card. Adding it exercised the seam
+> built in prompt 5.
+
+> **22. (self-correction, real bug)** "Anthropic returns 400 for an exhausted
+> credit balance as well as for a malformed request, and we tell the user to
+> shorten their topic. Separate them."
+> — a billing problem was being reported as a user error, sending people to fix
+> something that was not theirs to fix. Now surfaced as a configuration error
+> aimed at the site owner.
+
+> **23. (self-correction)** "The Anthropic SDK refuses to construct under jsdom,
+> so the provider tests fail. Split the suite by environment instead of
+> weakening the SDK's guard."
+> — the SDK is right: constructing it in a browser context implies an API key
+> in a browser. Components now run under jsdom and server code under node, as
+> two Vitest projects.
+
 ---
 
 ## 4. Where the AI was wrong
@@ -192,6 +220,10 @@ successes:
   their profile" policy also allowed `PATCH {"generations_used": 0}` from the
   browser. The free-plan limit was bypassable in one HTTP request. Nothing in
   the code review would have caught it; only attacking the live project did.
+- **It reported a billing failure as the user's mistake.** Anthropic returns 400
+  for both a malformed request and an empty credit balance. One mapping covered
+  both, so "add credits to your account" reached the user as "try shortening the
+  topic" — an error message that actively misdirects is worse than a generic one.
 - **It shipped a container that worked but was wrong.** The first image passed
   every smoke test while quietly downloading a package at startup — a
   network-dependent boot that would fail in an air-gapped or rate-limited

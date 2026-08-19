@@ -42,6 +42,7 @@ The app runs without any configuration, but with reduced capability:
 |---|---|
 | Nothing set | Landing, pricing, 404, theming. Sign-in shows a "not configured" notice. |
 | Supabase only | Accounts, dashboard, history. Generation falls back to the offline writer. |
+| Supabase + `GEMINI_API_KEY` | Everything, with real drafts. Google's free tier needs no card. |
 | Supabase + `ANTHROPIC_API_KEY` | Everything, with real drafts from Claude. |
 
 To try generation locally without any accounts:
@@ -66,10 +67,11 @@ the browser bundle and must be public; everything else stays server-side.
 | `VITE_SUPABASE_ANON_KEY` | client | for accounts | Public anon key; RLS is what protects data |
 | `VITE_APP_NAME` | client | no | Product name in the UI (default `Inboxly`) |
 | `VITE_API_BASE_URL` | client | no | Defaults to same-origin `/api` |
-| `ANTHROPIC_API_KEY` | server | for real drafts | Without it the offline writer is used |
+| `ANTHROPIC_API_KEY` | server | one of the two | Claude, `claude-opus-5` |
+| `GEMINI_API_KEY` | server | one of the two | Gemini, `gemini-3.6-flash` — free tier, no card |
 | `SUPABASE_URL` | server | for accounts | Usually the same as `VITE_SUPABASE_URL` |
 | `SUPABASE_SERVICE_ROLE_KEY` | server | recommended | Lets the quota counter bypass RLS so users cannot reset their own usage |
-| `EMAIL_PROVIDER` | server | no | `anthropic` or `mock`; otherwise inferred from the API key |
+| `EMAIL_PROVIDER` | server | no | `anthropic`, `gemini` or `mock`. Omitted, the first available key wins: Anthropic, then Gemini, then the offline writer |
 | `ALLOW_ANONYMOUS_GENERATION` | server | no | `true` allows unauthenticated generation — local development only |
 
 ---
@@ -129,7 +131,7 @@ The migration creates:
 | Animation | Framer Motion | Scroll reveals and result transitions |
 | Forms | React Hook Form + Zod | One schema validates the form and the endpoint |
 | Auth + data | Supabase | Auth, Postgres and row level security in one free tier |
-| AI | Anthropic `claude-opus-5` | Streaming, behind a provider interface |
+| AI | Claude `claude-opus-5` or Gemini `gemini-3.6-flash` | Three implementations of one interface; streaming in all cases |
 | Tests | Vitest + Testing Library | Same transform pipeline as the app |
 | Hosting | Vercel (edge function) + Docker | Two deployment targets from one handler |
 
@@ -148,6 +150,7 @@ The migration creates:
 │   └── providers/               # The AI seam
 │       ├── types.ts             #   EmailProvider interface
 │       ├── anthropic.ts         #   Claude implementation
+│       ├── gemini.ts            #   Gemini implementation
 │       ├── mock.ts              #   Offline implementation
 │       └── index.ts             #   resolveProvider()
 ├── src/
@@ -187,8 +190,12 @@ server bundle imports it and does not share the `@/` alias.
 `EmailProvider` is a three-member interface: an id, a model name, and
 `stream()`, which yields text chunks. Everything else — validation, auth,
 quotas, transport, persistence, error mapping — sits above it and knows nothing
-about Claude. Swapping models means adding one file and one line in
-`resolveProvider()`.
+about any particular model.
+
+There are three implementations: Claude, Gemini and the offline writer. That is
+not decoration — the second one was added after the fact, and it cost one new
+file plus one line in `resolveProvider()`. The prompt builder, the parser, the
+streaming transport, the quota logic and every test were untouched.
 
 The offline provider is not a toy: it drives the same streaming path, and it is
 what the tests and CI run against, so the pipeline is exercised on every commit
@@ -306,7 +313,7 @@ Node process on `PORT` (default 8080) — which is what the Docker image does.
 npm test
 ```
 
-27 tests across three files:
+35 tests across four files:
 
 - `src/lib/generation/prompt.test.ts` — prompt construction and the response
   parser, including the awkward cases: code fences, a bolded subject label, a
@@ -314,9 +321,17 @@ npm test
 - `server/generate-handler.test.ts` — the endpoint contract: method and CORS
   handling, malformed JSON, schema rejections, the streaming happy path, and the
   two failure modes that should never be opaque (missing auth, missing config).
+- `server/providers/index.test.ts` — the provider selection rules: precedence,
+  explicit pinning, failing loudly when a pinned provider has no key, and
+  degrading to the offline writer rather than breaking.
 - `src/features/generator/generator-form.test.tsx` — form behaviour through the
   DOM: validation blocking submission, defaults being submitted, recipient
   trimming, the busy and quota-blocked states.
+
+The suite runs in two Vitest projects: components under jsdom, server code under
+node. The Anthropic SDK refuses to construct in a browser-like environment —
+correctly, since that would imply an API key in a browser — so a single shared
+environment cannot cover both.
 
 They run against the offline provider, so the suite needs no API key and no
 network.

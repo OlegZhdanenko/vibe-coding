@@ -33,10 +33,32 @@ export default defineConfig(({ mode }) => {
       },
     },
     test: {
-      environment: 'jsdom',
-      globals: true,
-      setupFiles: ['./src/test/setup.ts'],
-      css: true,
+      // Two environments, because the two halves of the codebase genuinely
+      // differ: components need a DOM, and the Anthropic SDK refuses to
+      // construct in a browser-like environment — correctly, since that would
+      // mean an API key in a browser.
+      projects: [
+        {
+          extends: true,
+          test: {
+            name: 'client',
+            environment: 'jsdom',
+            globals: true,
+            setupFiles: ['./src/test/setup.ts'],
+            include: ['src/**/*.test.{ts,tsx}'],
+            css: true,
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'server',
+            environment: 'node',
+            globals: true,
+            include: ['server/**/*.test.ts'],
+          },
+        },
+      ],
       coverage: {
         provider: 'v8',
         include: ['src/**/*.{ts,tsx}', 'server/**/*.ts'],
