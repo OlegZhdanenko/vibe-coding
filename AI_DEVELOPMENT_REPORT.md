@@ -73,159 +73,128 @@ step and saved a meaningful amount of churn.
 
 ## 3. The prompts that shaped the project
 
-The first two are my literal messages. The rest are the specific instructions
-and self-corrections that actually changed the code — I have written them as
-prompts so they are reusable, and marked which were mine and which were the
-agent's own steering.
+Twenty prompts, in the order they mattered. Some are my literal messages
+(marked *mine*); the rest are the specific instructions and self-corrections
+that actually changed the code, written as prompts so they are reusable.
 
 > **1. (mine — the whole brief)**
-> "потрібно реалізувати функціонал згідно докам […] розроби покроковий план"
-> — pasted with the full assignment text. Asking for a plan rather than code
-> was the single highest-leverage decision: it surfaced the blocking questions
-> before any file was written.
+> "потрібно реалізувати функціонал згідно докам […] розроби покроковий план",
+> pasted with the full assignment, then "поїхали" to approve execution.
+> Asking for a plan rather than code was the single highest-leverage decision:
+> it surfaced every blocking question before a file was written.
 
-> **2. (mine)** "поїхали" — approval to execute the plan autonomously.
+> **2. (agent → me, clarifying)** "Which auth, which AI provider, which deploy
+> target, which UI stack?" — four options each, recommendation first, trade-off
+> spelled out. Answers: Supabase, a real API, Vercel, Tailwind + shadcn/ui +
+> Framer Motion.
 
-> **3. (agent → me, clarifying)** "Which auth, which AI provider, which deploy
-> target, which UI stack?" — four options each, with a recommendation first and
-> the trade-off spelled out. Answers: Supabase, real Anthropic API, Vercel,
-> Tailwind + shadcn/ui + Framer Motion.
-
-> **4.** "Before writing any Anthropic code, verify the current model IDs,
+> **3.** "Before writing any provider code, verify the current model IDs,
 > parameters and streaming API rather than relying on recalled patterns."
-> — this caught that `budget_tokens` is removed on current models and that
-> `effort` lives inside `output_config`, not at the top level.
+> — caught that `budget_tokens` is removed on current Claude models and that
+> `effort` lives inside `output_config`; later caught that `gemini-2.5-flash`
+> is no longer issued to new accounts.
 
-> **5.** "Design the AI integration so the model can be swapped by adding one
+> **4.** "Design the AI integration so the model can be swapped by adding one
 > file. Everything above the seam — validation, quotas, transport, persistence
-> — must know nothing about Claude."
-> — produced `EmailProvider` and `resolveProvider()`.
+> — must know nothing about the provider."
+> — produced `EmailProvider` and `resolveProvider()`, which later absorbed both
+> adding Gemini and removing Claude without touching anything else.
 
-> **6.** "Write the endpoint as `(Request, env) => Response` so the same
-> function can be hosted by the Vercel edge runtime, the Vite dev server and a
-> plain Node server. No second implementation for local development."
-> — the decision that later made the Docker image trivial.
+> **5.** "Write the endpoint as `(Request, env) => Response` so the same
+> function can be hosted by Vercel, the Vite dev server and a plain Node server.
+> No second implementation for local development."
 
-> **7.** "Stream the result as newline-delimited JSON with `delta`, `done` and
+> **6.** "Stream the result as newline-delimited JSON with `delta`, `done` and
 > `error` frames. Mid-stream failures must arrive as a frame, because the HTTP
 > status has already been sent by then."
 
-> **8.** "Build the error handling before the first feature: a closed set of
+> **7.** "Build the error handling before the first feature: a closed set of
 > error codes, each with a user-safe message, a route `errorElement`, a render
-> boundary above the router, and explicit loading/empty/error states on every
-> async surface."
+> boundary above the router, and explicit loading, empty and error states on
+> every async surface."
 
-> **9.** "Enforce the free-plan quota on the server with the service role key. A
+> **8.** "Enforce the free-plan quota on the server with the service role key. A
 > client-side check is a suggestion, not a rule."
 
-> **10.** "Write the SQL migration with row level security on both tables, a
+> **9.** "Write the SQL migration with row level security on both tables, a
 > trigger that creates the profile row inside the signup transaction, and a
 > `security definer` function for the usage counter. Make it idempotent."
 
-> **11.** "The prompt asks the model for `Subject:` on the first line. Treat
+> **10.** "The prompt asks the model for `Subject:` on the first line. Treat
 > that as advisory: if the marker is missing, the entire output becomes the
 > body. Never drop the email because the format slipped."
 > — the parser test suite came directly from this instruction.
 
-> **12. (self-correction, real bug)** "Supabase queries are typing `update()` as
+> **11. (self-correction, real bug)** "Supabase queries are typing `update()` as
 > `never`. Find the cause rather than casting it away."
 > — root cause: `Database` was declared with `interface`. Interfaces get no
 > implicit index signature, so the schema silently failed postgrest's
-> `Record<string, unknown>` constraint and every query degraded to `never`.
-> Switching to `type` fixed it. A cast would have hidden a real loss of type
-> safety across the whole data layer.
+> `Record<string, unknown>` constraint and every query degraded to `never`. A
+> cast would have hidden a real loss of type safety across the data layer.
 
-> **13. (self-correction, real bug)** "The bolded-subject test fails: the parser
+> **12. (self-correction, real bug)** "The bolded-subject test fails: the parser
 > returns `** Invoice 204`." — the regex allowed `**` before the colon but not
-> after, so `**Subject:** Invoice 204` leaked asterisks into the subject. Found
-> by a test written specifically for model output that does not follow
-> instructions.
+> after. Found by a test written specifically for model output that *disobeys*
+> the prompt, which is what you actually get some percentage of the time.
 
-> **14. (verification)** "The features section renders blank in the screenshot —
-> determine whether that is a real bug or a headless artifact before changing
-> anything."
-> — it was an artifact: headless Chrome's layout viewport was smaller than the
-> requested window, so scroll-triggered reveals never fired. Confirmed by
-> screenshotting a section that sits above the fold and seeing it render
-> correctly. No code change; a less careful pass would have "fixed" working
-> code.
+> **13. (verification discipline)** "Blank sections and clipped mobile
+> screenshots — decide whether each is a real bug or a tooling artefact before
+> changing anything."
+> — both were artefacts. Headless Chrome's layout viewport was smaller than the
+> requested window, so scroll-triggered reveals never fired; and Chrome will not
+> size a window below ~500px on macOS. Driving it over CDP with real device
+> metrics and measuring `scrollWidth` against `innerWidth` gave `390 === 390`.
+> A less careful pass would have "fixed" working code twice.
 
-> **15. (verification)** "Mobile screenshots look clipped. Chrome will not size
-> a window below ~500px on macOS — drive it over CDP with real device metrics
-> and measure `scrollWidth` against `innerWidth`."
-> — result: `390 === 390`, no horizontal overflow. The clipping was the tool,
-> not the layout.
+> **14. (self-correction, real bug)** "Verify the Docker image by running it,
+> then read the logs, not just the status codes."
+> — every smoke test passed while the container quietly downloaded `tsx` at
+> startup: a network-dependent boot that would fail in an air-gapped or
+> rate-limited environment. Replaced with an esbuild bundle and plain `node`.
 
-> **16. (self-correction, real bug)** "The container logs show `npx` downloading
-> tsx at startup. The runtime image must not fetch anything or carry a
-> TypeScript toolchain."
-> — replaced with an esbuild bundle and `node dist-server/index.js`.
+> **15.** "Every lint error gets fixed at the source, not disabled, and no
+> tooling guard gets weakened to make a test pass."
+> — three React Compiler diagnostics turned out to be real improvements; one
+> warranted an inline disable, with a comment explaining why. Later the same
+> rule applied when the Anthropic SDK refused to construct under jsdom: the SDK
+> was right, so the suite was split into jsdom and node projects rather than
+> overriding the guard.
 
-> **17.** "Every lint error gets fixed at the source, not disabled. If a rule
-> genuinely does not apply, disable that one line and write down why."
-> — three React Compiler diagnostics turned out to be real improvements (lazy
-> state initialisation, a ref read during render, a `setState` in an effect);
-> exactly one warranted an inline disable, with a comment explaining it.
-
-> **18.** "Verify the Docker image by running it: health endpoint, static
-> files, SPA deep link, and a streaming generation. A build that succeeds is
-> not a container that works."
-
-> **19.** "Write the README's 'what is not built' section honestly. A demo that
-> pretends is worse than one that admits."
-
-> **20. (verification, found a security hole)** "The schema is live — now try to
+> **16. (verification, found a security hole)** "The schema is live — now try to
 > break it. Can a second user read the first user's drafts? Can a user reset
 > their own quota counter?"
 > — isolation held, but the quota did not: a plain `PATCH` with the public anon
-> key set `generations_used` back to zero. Fixed in `0002_lock_quota_column.sql`
-> with column privileges.
+> key set `generations_used` back to zero. Row security gates rows, not columns.
+> Fixed with column privileges in `0002_lock_quota_column.sql`.
 
-> **21. (mine)** "Which AI can be used for free — OpenAI? Gemini?"
-> — the answer that mattered was that OpenAI has no free API tier at all, while
-> Gemini's is genuinely free and needs no card. Adding it exercised the seam
-> built in prompt 5.
+> **17. (mine)** "Which AI can be used for free — OpenAI? Gemini?", and later
+> "remove every mention of `ANTHROPIC_API_KEY`."
+> — OpenAI has no free API tier; Gemini's is genuinely free and needs no card.
+> Adding it, then removing Claude, exercised the seam from prompt 4 in both
+> directions. The removal was taken as deleting the provider, not just its
+> documentation: code that reads a variable the docs refuse to acknowledge is
+> worse than either option alone.
 
-> **22. (self-correction, real bug)** "Anthropic returns 400 for an exhausted
-> credit balance as well as for a malformed request, and we tell the user to
+> **18. (self-correction, real bug)** "A 400 from the provider covers both a
+> malformed request and an exhausted credit balance, and we tell the user to
 > shorten their topic. Separate them."
 > — a billing problem was being reported as a user error, sending people to fix
-> something that was not theirs to fix. Now surfaced as a configuration error
-> aimed at the site owner.
+> something that was not theirs to fix.
 
-> **23. (deployment failure, real)** "Vercel rejected the deploy: the edge
-> function references `node:fs` and `node:path` through the Anthropic SDK.
-> Choose between dropping the SDK and changing runtime — do not paper over it."
-> — moved the function to the Node runtime and extracted `http-adapter.ts`,
-> which removed duplication between the dev middleware and the Docker server at
-> the same time. The handler itself did not change, which was the point of
-> writing it against Web types.
+> **19. (deployment failures, real)** "Vercel rejected the deploy over
+> `node:fs` in the edge function; then the deployed app still reported missing
+> Supabase keys although the dashboard showed them set."
+> — two distinct traps. The Anthropic SDK is not edge-compatible, so the
+> function moved to the Node runtime and the Node↔Web adapter was extracted and
+> shared by all three hosts. The second was worse: the variables had been
+> created as Vercel's **sensitive** type, which is withheld from the build step,
+> so the `VITE_*` values never reached the bundle while every dashboard and API
+> listing showed them present. Visible only by grepping the built artefact.
 
-> **24. (deployment debugging)** "The deployed app still says the Supabase keys
-> are missing, although the dashboard shows them set for Production. Find out
-> what the build actually received."
-> — the variables existed but were created as Vercel's **sensitive** type,
-> which is withheld from the build step. `VITE_*` values are inlined at build
-> time, so the bundle was compiled without them. Recreating them as ordinary
-> encrypted variables fixed it. Worth recording because both the dashboard and
-> the API listed the variables as present — the failure was invisible from
-> every surface except the built artefact.
-
-> **25. (mine)** "Remove every mention of `ANTHROPIC_API_KEY`."
-> — taken as removing the provider rather than only the documentation: code
-> that reads a variable the docs refuse to acknowledge is worse than either
-> option on its own. The SDK dependency, the provider, its branch in
-> `resolveProvider()`, its tests and the "Powered by Claude" copy all went in
-> one commit.
-
-> **26. (self-correction)** "The Anthropic SDK refuses to construct under jsdom,
-> so the provider tests fail. Split the suite by environment instead of
-> weakening the SDK's guard."
-> — the SDK is right: constructing it in a browser context implies an API key
-> in a browser. Components now run under jsdom and server code under node, as
-> two Vitest projects.
-
----
+> **20.** "Write the README's 'what is not built' section honestly, and verify
+> every claim by running something — `curl` the stream, screenshot the pages,
+> boot the container, attack the live database. A demo that pretends is worse
+> than one that admits."
 
 ## 4. Where the AI was wrong
 
