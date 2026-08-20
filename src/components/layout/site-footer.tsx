@@ -58,7 +58,7 @@ export function SiteFooter() {
         <p className="text-muted-foreground text-xs">
           © {new Date().getFullYear()} {env.appName}. Built as a test assignment.
         </p>
-        <p className="text-muted-foreground text-xs">Powered by Claude</p>
+        <p className="text-muted-foreground text-xs">Powered by Gemini</p>
       </div>
     </footer>
   )

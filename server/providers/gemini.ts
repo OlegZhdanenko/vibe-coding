@@ -14,9 +14,8 @@ const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODE
  * a Web-standard runtime. Adding a dependency would buy nothing and would have
  * to be audited for edge compatibility.
  *
- * `thinkingLevel: 'low'` is the counterpart of the Anthropic provider's
- * `effort: 'low'` — writing one short email is routine work, and the default
- * spends tokens and latency on reasoning this task does not need.
+ * `thinkingLevel: 'low'` because writing one short email is routine work: the
+ * default spends tokens and latency on reasoning this task does not need.
  */
 export function createGeminiProvider(apiKey: string): EmailProvider {
   return {

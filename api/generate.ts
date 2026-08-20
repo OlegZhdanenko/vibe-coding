@@ -5,11 +5,11 @@ import { requestUrl, toWebRequest, writeWebResponse } from '../server/http-adapt
 /**
  * Vercel Function (Node runtime).
  *
- * The edge runtime would be the natural fit for a streaming endpoint, but the
- * Anthropic SDK pulls in `node:fs` and `node:path`, which edge rejects. Rather
- * than drop the official SDK for hand-rolled HTTP, this runs on Node and adapts
- * the request and response — the Node runtime streams fine, and the handler
- * itself is unchanged.
+ * Node rather than edge. The edge runtime would suit a streaming endpoint, and
+ * nothing in the current dependency set rules it out — but this configuration
+ * is the one verified end to end in production, and swapping runtimes is not a
+ * change worth making untested. The Node runtime streams fine and the handler
+ * is identical either way.
  */
 export const config = { runtime: 'nodejs' }
 

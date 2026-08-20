@@ -38,7 +38,7 @@ export default function LandingPage() {
           >
             <Badge variant="secondary" className="gap-1.5">
               <Sparkles className="size-3.5" aria-hidden="true" />
-              Powered by Claude
+              Powered by Gemini
             </Badge>
 
             <h1 className="mt-5 text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">

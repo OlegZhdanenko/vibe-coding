@@ -7,7 +7,7 @@ import type { EmailProvider } from './types.js'
  *
  * It exists so the app is runnable and testable without an API key — local
  * development, CI, and the automated tests all use it. It is never selected
- * when `ANTHROPIC_API_KEY` is present.
+ * when `GEMINI_API_KEY` is present.
  */
 export function createMockProvider(): EmailProvider {
   return {
@@ -56,7 +56,7 @@ function composeMockEmail(input: GenerateEmailInput): string {
     'Best regards,',
     '[Your name]',
     '',
-    '— Generated in offline mode. Set ANTHROPIC_API_KEY to use the real model.',
+    '— Generated in offline mode. Set GEMINI_API_KEY to use the real model.',
   ].join('\n')
 }
 

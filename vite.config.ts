@@ -34,9 +34,8 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       // Two environments, because the two halves of the codebase genuinely
-      // differ: components need a DOM, and the Anthropic SDK refuses to
-      // construct in a browser-like environment — correctly, since that would
-      // mean an API key in a browser.
+      // differ: components need a DOM, while server code should be exercised
+      // under the runtime it actually ships on.
       projects: [
         {
           extends: true,

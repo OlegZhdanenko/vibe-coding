@@ -15,28 +15,30 @@ and what I would do next.
 | **Claude Code** (CLI, in VS Code) | **Claude Opus 5** (`claude-opus-5`) | The entire build: planning, code, tests, docs, debugging, verification |
 | **shadcn/ui CLI** | — | Vendoring the Radix-based component primitives |
 | **Headless Chrome via CDP** | — | Driven by the agent to screenshot and measure the running app |
-| **Anthropic API** | **Claude Opus 5** (`claude-opus-5`) | The product — one of two model backends |
-| **Google Gemini API** | **Gemini 3.6 Flash** (`gemini-3.6-flash`) | The product — the free-tier backend the live demo runs on |
+| **Google Gemini API** | **Gemini 3.6 Flash** (`gemini-3.6-flash`) | The product — the model that writes the emails |
+| **Anthropic API** | **Claude Opus 5** (`claude-opus-5`) | The product's original backend, since removed — see below |
 
 One agent, one model. I deliberately did not spread the work across several
 assistants: the value of an agentic tool is that it holds the whole repository
 in context, and splitting the work would have meant re-establishing that context
 repeatedly.
 
-**Two backends, one interface.** The build started on Claude alone. Gemini was
-added later, when the Anthropic account turned out to have no credit — and that
-turned into the best available evidence that the provider seam was real rather
-than aspirational: it cost one new file and one line, with the prompt builder,
-parser, streaming transport, quota logic and every existing test untouched. The
-live demo runs on Gemini's free tier; setting `ANTHROPIC_API_KEY` switches it to
-Claude with no code change.
+**The provider seam, exercised in both directions.** The build started on Claude
+alone. Gemini was added later, when the Anthropic account turned out to have no
+credit; Claude was then removed once Gemini was confirmed working. Both moves
+cost one file and one case in `resolveProvider()`, and neither touched the
+prompt builder, the parser, the streaming transport, the quota logic or any of
+their tests.
 
-**Model choice for the product.** `claude-opus-5` with `output_config.effort:
-'low'` and adaptive thinking left on. Writing one short email is routine work,
-so low effort keeps it fast and cheap, while leaving thinking enabled avoids the
-known failure modes of disabling it outright. Server-side fallbacks
-(`fallbacks: 'default'`) are enabled so a policy decline on a borderline topic
-is retried on another model inside the same call instead of dead-ending.
+That history is the point. "The architecture allows the model to be swapped" is
+easy to claim and hard to believe; doing it twice, in opposite directions,
+against a working deployment, is evidence.
+
+**Model settings.** `gemini-3.6-flash` with `thinkingLevel: 'low'`. Writing one
+short email is routine work, and the default spends tokens and latency on
+reasoning the task does not need. The Claude provider used the equivalent
+`output_config.effort: 'low'` for the same reason, with adaptive thinking left
+on to avoid the known failure modes of disabling it outright.
 
 ---
 
@@ -209,7 +211,14 @@ agent's own steering.
 > the API listed the variables as present — the failure was invisible from
 > every surface except the built artefact.
 
-> **25. (self-correction)** "The Anthropic SDK refuses to construct under jsdom,
+> **25. (mine)** "Remove every mention of `ANTHROPIC_API_KEY`."
+> — taken as removing the provider rather than only the documentation: code
+> that reads a variable the docs refuse to acknowledge is worse than either
+> option on its own. The SDK dependency, the provider, its branch in
+> `resolveProvider()`, its tests and the "Powered by Claude" copy all went in
+> one commit.
+
+> **26. (self-correction)** "The Anthropic SDK refuses to construct under jsdom,
 > so the provider tests fail. Split the suite by environment instead of
 > weakening the SDK's guard."
 > — the SDK is right: constructing it in a browser context implies an API key

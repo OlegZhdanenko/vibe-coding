@@ -85,7 +85,7 @@ export const FAQ: FaqItem[] = [
   {
     question: 'Which model writes the emails?',
     answer:
-      'Claude (claude-opus-5) via the Anthropic API. The call happens on the server, so the API key is never exposed to the browser. The model sits behind a provider interface, so switching to a different one is a single file.',
+      'Google Gemini (gemini-3.6-flash). The call happens on the server, so the API key is never exposed to the browser. The model sits behind a provider interface, so switching to a different one is a single file.',
   },
   {
     question: 'Do I need to pay to try it?',

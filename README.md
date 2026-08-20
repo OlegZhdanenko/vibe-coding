@@ -47,10 +47,6 @@ The app runs without any configuration, but with reduced capability:
 | Nothing set | Landing, pricing, 404, theming. Sign-in shows a "not configured" notice. |
 | Supabase only | Accounts, dashboard, history. Generation falls back to the offline writer. |
 | Supabase + `GEMINI_API_KEY` | Everything, with real drafts. Google's free tier needs no card. |
-| Supabase + `ANTHROPIC_API_KEY` | Everything, with real drafts from Claude. |
-
-Gemini is the default when both keys are present, because it is the backend the
-live demo runs on. `EMAIL_PROVIDER=anthropic` overrides that.
 
 To try generation locally without any accounts:
 
@@ -74,11 +70,10 @@ the browser bundle and must be public; everything else stays server-side.
 | `VITE_SUPABASE_ANON_KEY` | client | for accounts | Public anon key; RLS is what protects data |
 | `VITE_APP_NAME` | client | no | Product name in the UI (default `Inboxly`) |
 | `VITE_API_BASE_URL` | client | no | Defaults to same-origin `/api` |
-| `GEMINI_API_KEY` | server | one of the two | Gemini, `gemini-3.6-flash` — the default backend; free tier, no card |
-| `ANTHROPIC_API_KEY` | server | one of the two | Claude, `claude-opus-5` — used when no Gemini key is set, or when pinned |
+| `GEMINI_API_KEY` | server | for real drafts | Gemini, `gemini-3.6-flash` — free tier, no card. Without it the offline writer is used |
 | `SUPABASE_URL` | server | for accounts | Usually the same as `VITE_SUPABASE_URL` |
 | `SUPABASE_SERVICE_ROLE_KEY` | server | recommended | Lets the quota counter bypass RLS so users cannot reset their own usage |
-| `EMAIL_PROVIDER` | server | no | `gemini`, `anthropic` or `mock`. Omitted, the first available key wins: Gemini, then Claude, then the offline writer |
+| `EMAIL_PROVIDER` | server | no | `gemini` or `mock`. Omitted, Gemini is used when its key is present, otherwise the offline writer |
 | `ALLOW_ANONYMOUS_GENERATION` | server | no | `true` allows unauthenticated generation — local development only |
 
 ---
@@ -138,7 +133,7 @@ The migration creates:
 | Animation | Framer Motion | Scroll reveals and result transitions |
 | Forms | React Hook Form + Zod | One schema validates the form and the endpoint |
 | Auth + data | Supabase | Auth, Postgres and row level security in one free tier |
-| AI | Gemini `gemini-3.6-flash` (default), Claude `claude-opus-5` | Three implementations of one interface; streaming in all cases |
+| AI | Google Gemini `gemini-3.6-flash` | Behind a provider interface, streamed over SSE |
 | Tests | Vitest + Testing Library | Same transform pipeline as the app |
 | Hosting | Vercel Function + Docker | Two deployment targets from one handler |
 
@@ -157,7 +152,6 @@ The migration creates:
 │   ├── vite-dev-api.ts          # Dev-server host for the same handler
 │   └── providers/               # The AI seam
 │       ├── types.ts             #   EmailProvider interface
-│       ├── anthropic.ts         #   Claude implementation
 │       ├── gemini.ts            #   Gemini implementation
 │       ├── mock.ts              #   Offline implementation
 │       └── index.ts             #   resolveProvider()
@@ -200,10 +194,13 @@ server bundle imports it and does not share the `@/` alias.
 quotas, transport, persistence, error mapping — sits above it and knows nothing
 about any particular model.
 
-There are three implementations: Claude, Gemini and the offline writer. That is
-not decoration — the second one was added after the fact, and it cost one new
-file plus one line in `resolveProvider()`. The prompt builder, the parser, the
-streaming transport, the quota logic and every test were untouched.
+There are two implementations: Gemini and the offline writer. The seam has been
+exercised in both directions — a Gemini provider was added to what was then a
+Claude-only codebase, and the Claude provider was later removed — each time by
+adding or deleting one file and one case in `resolveProvider()`. The prompt
+builder, the parser, the streaming transport, the quota logic and their tests
+were untouched on both occasions. That history is the evidence the abstraction
+is real rather than asserted.
 
 The offline provider is not a toy: it drives the same streaming path, and it is
 what the tests and CI run against, so the pipeline is exercised on every commit
@@ -218,11 +215,10 @@ middleware, and the Node server in the Docker image, each through the same
 local mock — means production runs code that development never exercises.
 
 The Vercel function runs on the **Node runtime, not edge**. Edge would suit a
-streaming endpoint better, but the Anthropic SDK pulls in `node:fs` and
-`node:path`, which the edge runtime rejects. Given the choice between dropping
-the official SDK for hand-rolled HTTP and moving one adapter to Node, the Node
-runtime is the smaller compromise — it streams fine, and the handler is
-untouched either way.
+streaming endpoint, and nothing in the current dependency set rules it out — but
+the Node configuration is the one verified end to end against production, and
+swapping runtimes untested is not a trade worth making. The handler is identical
+either way.
 
 ### Streaming as newline-delimited JSON
 
@@ -237,7 +233,7 @@ fails mid-stream, the 200 has already been sent.
 The brief asks for no white screens, so there are four nets:
 
 1. `AppError` — a closed set of codes with a user-safe message on every one.
-   Supabase and Anthropic errors are translated at their boundaries, never
+   Supabase and provider errors are translated at their boundaries, never
    surfaced raw.
 2. Route `errorElement` — catches loader throws and render errors below a route.
 3. `ErrorBoundary` — wraps the router, catching what routing cannot.
@@ -278,7 +274,7 @@ a policy decline on a borderline topic is retried rather than dead-ending.
 ```bash
 docker build -t inboxly .
 docker run -p 8080:8080 \
-  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -e GEMINI_API_KEY=... \
   -e SUPABASE_URL=https://your-project.supabase.co \
   -e SUPABASE_SERVICE_ROLE_KEY=... \
   inboxly
@@ -315,8 +311,11 @@ with no TypeScript toolchain at run time, and exposes `/healthz`.
 3. Deploy. `api/generate.ts` becomes a Node function; `vercel.json` rewrites
    everything except `/api/*` to `index.html` so deep links work.
 
-   `GEMINI_API_KEY` is all the live demo needs. If both keys are set, Gemini
-   wins; pin `EMAIL_PROVIDER=anthropic` to prefer Claude.
+   `GEMINI_API_KEY` is all the live demo needs.
+
+   Create them as ordinary (encrypted) variables, **not** Vercel's *sensitive*
+   type: sensitive variables are withheld from the build step, and `VITE_*`
+   values are inlined at build time, so the bundle would ship without them.
 
 ### Anywhere else
 
@@ -331,7 +330,7 @@ Node process on `PORT` (default 8080) — which is what the Docker image does.
 npm test
 ```
 
-37 tests across four files:
+33 tests across four files:
 
 - `src/lib/generation/prompt.test.ts` — prompt construction and the response
   parser, including the awkward cases: code fences, a bolded subject label, a
@@ -339,8 +338,7 @@ npm test
 - `server/generate-handler.test.ts` — the endpoint contract: method and CORS
   handling, malformed JSON, schema rejections, the streaming happy path, and the
   two failure modes that should never be opaque (missing auth, missing config).
-- `server/providers/index.test.ts` — the provider selection rules: precedence
-  (Gemini first),
+- `server/providers/index.test.ts` — the provider selection rules:
   explicit pinning, failing loudly when a pinned provider has no key, and
   degrading to the offline writer rather than breaking.
 - `src/features/generator/generator-form.test.tsx` — form behaviour through the
@@ -348,9 +346,7 @@ npm test
   trimming, the busy and quota-blocked states.
 
 The suite runs in two Vitest projects: components under jsdom, server code under
-node. The Anthropic SDK refuses to construct in a browser-like environment —
-correctly, since that would imply an API key in a browser — so a single shared
-environment cannot cover both.
+node, so each half is exercised in the environment it actually ships to.
 
 They run against the offline provider, so the suite needs no API key and no
 network.
