@@ -3,8 +3,12 @@
 Describe the email you need to write, pick a tone and a length, and get a
 send-ready subject line and message. Built as a 48-hour MVP test assignment.
 
-- **Live demo:** _to be filled in after deployment_
-- **Repository:** _to be filled in after the first push_
+- **Live demo:** https://vibe-coding-two-bice.vercel.app
+- **Repository:** https://github.com/OlegZhdanenko/vibe-coding
+
+Running on Gemini's free tier, so generation costs nothing to try. Create an
+account with any email — confirmation is disabled on the demo project — and the
+free plan gives you ten drafts.
 
 ---
 
@@ -29,7 +33,7 @@ send-ready subject line and message. Built as a 48-hour MVP test assignment.
 Requirements: **Node 24+** and npm.
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/OlegZhdanenko/vibe-coding.git
 cd vibe-coding
 npm install
 cp .env.example .env.local   # fill in the values, see below

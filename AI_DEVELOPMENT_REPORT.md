@@ -3,6 +3,9 @@
 How this project was actually built, what the AI did well, where it was wrong,
 and what I would do next.
 
+- **Live demo:** https://vibe-coding-two-bice.vercel.app
+- **Repository:** https://github.com/OlegZhdanenko/vibe-coding
+
 ---
 
 ## 1. Tools and models
@@ -196,7 +199,17 @@ agent's own steering.
 > the same time. The handler itself did not change, which was the point of
 > writing it against Web types.
 
-> **24. (self-correction)** "The Anthropic SDK refuses to construct under jsdom,
+> **24. (deployment debugging)** "The deployed app still says the Supabase keys
+> are missing, although the dashboard shows them set for Production. Find out
+> what the build actually received."
+> — the variables existed but were created as Vercel's **sensitive** type,
+> which is withheld from the build step. `VITE_*` values are inlined at build
+> time, so the bundle was compiled without them. Recreating them as ordinary
+> encrypted variables fixed it. Worth recording because both the dashboard and
+> the API listed the variables as present — the failure was invisible from
+> every surface except the built artefact.
+
+> **25. (self-correction)** "The Anthropic SDK refuses to construct under jsdom,
 > so the provider tests fail. Split the suite by environment instead of
 > weakening the SDK's guard."
 > — the SDK is right: constructing it in a browser context implies an API key
